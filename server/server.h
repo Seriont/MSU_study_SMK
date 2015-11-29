@@ -1,9 +1,12 @@
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <netinet/in.h>
 #include <vector>
 #include <set>
+#include <cstring>
 #include <string>
 #include <unistd.h>
+#include "../constants.h"
 
 //we should describe the User class, whether it should
 // be global or not, and what demands should it meet
@@ -25,15 +28,15 @@ class Server
 public:
 	bool startServer();
 	bool process();
-	bool getMessage(string &message, User *user);
-	void sendToAllMessage(string &message, User *user);
+	bool getMessage(std::string &message, User *user);
+	void sendToAllMessage(std::string &message, User *user);
 	void sendServerMessage(void);
-	void addNewClient();
+	bool addNewClient();
 	bool isNameValid(void); // checking for forbidden characters
 	bool isNameUsed(void); // checking for equal usernames
 	Server() {}
 private:
-	set<User *> clients;
+	std::set<User *> clients;
 	int listening_socket;
 };
 
@@ -43,12 +46,15 @@ bool Server::startServer()
 	this->listening_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (listening_socket < 0)
 		return false;
-	sockaddr addr;
+	sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(PORT); // PORT is a constant
 	addr.sin_addr.s_addr = INADDR_ANY;
-	if (bind(this->listening_socket, &addr, sizeof(addr)) != 0)
+	if (bind(this->listening_socket, (struct sockaddr *) &addr,
+		 sizeof(addr)) != 0)
+	{
 		return false;
+	}
 	listen(this->listening_socket, 5);
 	return true;
 }
@@ -63,12 +69,12 @@ bool Server::process()
 		FD_ZERO(&read_fds);
 		int max_number = this->listening_socket;
 		FD_SET(this->listening_socket, &read_fds);
-		for (set<User *>::iterator it = this->clients.begin(); 
+		for (std::set<User *>::iterator it = this->clients.begin(); 
 			it != this->clients.end(); it++)
 		{
-			FD_SET(it->socket, &read_fds);
-			if (it->socket > max_number)
-				max_number = it->socket;
+			FD_SET((*it)->socket, &read_fds);
+			if ((*it)->socket > max_number)
+				max_number = (*it)->socket;
 		}
 		// query handling
 		int result = select(max_number + 1, &read_fds, NULL, NULL, NULL);
@@ -81,27 +87,27 @@ bool Server::process()
 				return false;
 		}
 		// message reading and deleting closed sockets
-		vector<User *> clear_stack;
-		for (set<User *>::iterator it = this->clients.begin();
+		std::vector<User *> clear_stack;
+		for (std::set<User *>::iterator it = this->clients.begin();
 			it != this->clients.end(); it++)
 		{
-			if (FD_ISSET(*it, &read_fds)) {
-				string message;
-				if (!getMessage(message, it)) {
-					close(it->socket);
-					clear_stack.push_back(it);
+			if (FD_ISSET((*it)->socket, &read_fds)) {
+				std::string message;
+				if (!getMessage(message, *it)) {
+					close((*it)->socket);
+					clear_stack.push_back(*it);
 					continue;
 				}
-				sendToAllMessage(message, it);
+				sendToAllMessage(message, *it);
 			}
 		}
 		// clients' set refreshment
 		int length = (int) clear_stack.size();
 		while (length > 0)
 		{
-			User *element = pop_back(clear_stack);
-			this->clients.erase(element);
 			length--;
+			this->clients.erase(clear_stack[length]);
+			clear_stack.pop_back();
 		}
 	}
 }
