@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <iostream>
 #include "../constants.h"
+#include <cstdio>
 
 //we should describe the User class, whether it should
 // be global or not, and what demands should it meet
@@ -58,10 +59,10 @@ bool Server::startServer()
 		 sizeof(addr)) != 0)
 	{
 		perror("error: couldn't call bind");
-		fclose(listening_socket);
+		close(listening_socket);
 		return false;
 	}
-	if (listen(listening_socket, MAX_REQUEST))
+	if (listen(listening_socket, MAX_REQUESTS))
 	{
 		perror("error: couldn't call listen");
 		close(listening_socket);
