@@ -6,6 +6,7 @@
 #include <cstring>
 #include <string>
 #include <unistd.h>
+#include <iostream>
 #include "../constants.h"
 
 //we should describe the User class, whether it should
@@ -28,10 +29,11 @@ class Server
 public:
 	bool startServer();
 	bool process();
+	void sendServerMessage(char message[]);
 	Server() {}
 private:
 	bool getMessage(char message[], User *user);
-	void sendToAllMessage(char message[], User *user);
+	void sendToAllMessage(char message[]);
 	bool addNewClient();
 	// bool isNameValid(void); // checking for forbidden characters
 	// bool isNameUsed(void); // checking for equal usernames
@@ -87,11 +89,21 @@ bool Server::getMessage(char message[], User *user)
 
 void Server::sendToAllMessage(char message[])
 {
-	for (std::set<User *> iterator it = clients.begin();
+	for (std::set<User *>::iterator it = clients.begin();
 		it != clients.end(); it++)
 	{
-		write((*it)->socket, message, strlen(message) + 1);
+		if (write((*it)->socket, message, strlen(message) + 1) < 0)
+		{
+			std::cout << "Didn't manage to send the message to user[";
+			std::cout << (*it)->socket << "]!" << std::endl;
+		}
 	}
+}
+
+
+void Server::sendServerMessage(char message[])
+{
+	sendToAllMessage(message);
 }
 
 
@@ -134,13 +146,14 @@ bool Server::process()
 
 		// <current_clients> is a list of clients, who were in session
 		// in the beginning of the current iteration of the cycle
-		User *current_clients = new (User *)[client.size()];
-		for (int i = 0, std::set<User *>::iterator it = client.begin();
-			it != client.end(); it++, i++)
+		User **current_clients = new User*[(const int)clients.size()];
+		int i = 0;
+		for (std::set<User *>::iterator it = clients.begin();
+			it != clients.end(); it++, i++)
 		{
 			current_clients[i] = *it;
 		}
-		for (int i = 0; i < (int)client.size(); i++)
+		for (int i = 0; i < (int)clients.size(); i++)
 		{
 			if (FD_ISSET(current_clients[i]->socket, &read_fds))
 			{
@@ -157,7 +170,7 @@ bool Server::process()
 					clients.erase(current_clients[i]);
 					continue;
 				}
-				sendToAllMessage(message, current_clients[i]);
+				sendToAllMessage(message);
 			}
 		}
 		delete [] current_clients;
