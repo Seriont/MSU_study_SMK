@@ -46,7 +46,10 @@ bool Server::startServer()
 {
 	listening_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (listening_socket < 0)
+	{
+		perror("error: couldn't call socket");
 		return false;
+	}
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(PORT); // PORT is a constant
@@ -54,9 +57,16 @@ bool Server::startServer()
 	if (bind(listening_socket, (struct sockaddr *) &addr,
 		 sizeof(addr)) != 0)
 	{
+		fclose(listening_socket);
+		perror("error: couldn't call bind");
 		return false;
 	}
-	listen(listening_socket, 5);
+	if (listen(listening_socket, 5))
+	{
+		close(listening_socket);
+		perror("error: couldn't call listen");
+		return false;
+	}
 	return true;
 }
 
