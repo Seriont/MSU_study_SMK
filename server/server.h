@@ -28,14 +28,13 @@ class Server
 public:
 	bool startServer();
 	bool process();
-	bool getMessage(std::string &message, User *user);
-	void sendToAllMessage(std::string &message, User *user);
-	void sendServerMessage(void);
-	bool addNewClient();
-	bool isNameValid(void); // checking for forbidden characters
-	bool isNameUsed(void); // checking for equal usernames
 	Server() {}
 private:
+	bool getMessage(char message[], User *user);
+	void sendToAllMessage(char message[], User *user);
+	bool addNewClient();
+	// bool isNameValid(void); // checking for forbidden characters
+	// bool isNameUsed(void); // checking for equal usernames
 	std::set<User *> clients;
 	int listening_socket;
 };
@@ -43,20 +42,56 @@ private:
 
 bool Server::startServer() 
 {
-	this->listening_socket = socket(AF_INET, SOCK_STREAM, 0);
+	listening_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (listening_socket < 0)
 		return false;
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(PORT); // PORT is a constant
 	addr.sin_addr.s_addr = INADDR_ANY;
-	if (bind(this->listening_socket, (struct sockaddr *) &addr,
+	if (bind(listening_socket, (struct sockaddr *) &addr,
 		 sizeof(addr)) != 0)
 	{
 		return false;
 	}
-	listen(this->listening_socket, 5);
+	listen(listening_socket, 5);
 	return true;
+}
+
+
+bool Server::addNewClient()
+{
+	int socket = accept(listening_socket, NULL, NULL);
+	if (socket < 0)
+	{
+		return false;
+	}
+	User *new_user = new User();
+	new_user->socket = socket;
+	clients.insert(new_user);
+	return true;
+}
+
+
+bool Server::getMessage(char message[], User *user)
+{
+	size_t bytes_read = read(user->socket, message, MAX_MESSAGE_LEN);
+	if (bytes_read < 0)
+	{
+		return false;
+	}
+	message[bytes_read/sizeof(char)] = '\0';
+	return true;
+}
+
+
+void Server::sendToAllMessage(char message[])
+{
+	for (std::set<User *> iterator it = clients.begin();
+		it != clients.end(); it++)
+	{
+		write((*it)->socket, message, strlen(message) + 1);
+	}
 }
 
 
@@ -67,47 +102,64 @@ bool Server::process()
 	{
 		// read_fds initialization
 		FD_ZERO(&read_fds);
-		int max_number = this->listening_socket;
-		FD_SET(this->listening_socket, &read_fds);
-		for (std::set<User *>::iterator it = this->clients.begin(); 
-			it != this->clients.end(); it++)
+		int max_number = listening_socket;
+		FD_SET(listening_socket, &read_fds);
+		for (std::set<User *>::iterator it = clients.begin(); 
+			it != clients.end(); it++)
 		{
 			FD_SET((*it)->socket, &read_fds);
 			if ((*it)->socket > max_number)
 				max_number = (*it)->socket;
 		}
 		// query handling
-		int result = select(max_number + 1, &read_fds, NULL, NULL, NULL);
-		if (result < 1)
+
+		// waiting for queries
+
+		// the last pointer is a timer
+		if (select(max_number + 1, &read_fds, NULL, NULL, NULL) < 1)
+		{
 			return false;
+		}
+
 		// new client adding
-		if (FD_ISSET(this->listening_socket, &read_fds))
+		if (FD_ISSET(listening_socket, &read_fds))
 		{
 			if (!addNewClient())
+			{
 				return false;
-		}
-		// message reading and deleting closed sockets
-		std::vector<User *> clear_stack;
-		for (std::set<User *>::iterator it = this->clients.begin();
-			it != this->clients.end(); it++)
-		{
-			if (FD_ISSET((*it)->socket, &read_fds)) {
-				std::string message;
-				if (!getMessage(message, *it)) {
-					close((*it)->socket);
-					clear_stack.push_back(*it);
-					continue;
-				}
-				sendToAllMessage(message, *it);
 			}
 		}
-		// clients' set refreshment
-		int length = (int) clear_stack.size();
-		while (length > 0)
+
+		// message reading and deleting closed sockets
+
+		// <current_clients> is a list of clients, who were in session
+		// in the beginning of the current iteration of the cycle
+		User *current_clients = new (User *)[client.size()];
+		for (int i = 0, std::set<User *>::iterator it = client.begin();
+			it != client.end(); it++, i++)
 		{
-			length--;
-			this->clients.erase(clear_stack[length]);
-			clear_stack.pop_back();
+			current_clients[i] = *it;
 		}
+		for (int i = 0; i < (int)client.size(); i++)
+		{
+			if (FD_ISSET(current_clients[i]->socket, &read_fds))
+			{
+				char message[MAX_MESSAGE_LEN+1];
+				if (!getMessage(message, current_clients[i]))
+				{
+					return false;
+				}
+				if (strlen(message) == 0)
+				{
+					// in this case user's quitened and his socket
+					// should be deleted
+					close(current_clients[i]->socket);
+					clients.erase(current_clients[i]);
+					continue;
+				}
+				sendToAllMessage(message, current_clients[i]);
+			}
+		}
+		delete [] current_clients;
 	}
 }
