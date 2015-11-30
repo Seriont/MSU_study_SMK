@@ -57,14 +57,14 @@ bool Server::startServer()
 	if (bind(listening_socket, (struct sockaddr *) &addr,
 		 sizeof(addr)) != 0)
 	{
-		fclose(listening_socket);
 		perror("error: couldn't call bind");
+		fclose(listening_socket);
 		return false;
 	}
-	if (listen(listening_socket, 5))
+	if (listen(listening_socket, MAX_REQUEST))
 	{
-		close(listening_socket);
 		perror("error: couldn't call listen");
+		close(listening_socket);
 		return false;
 	}
 	return true;
