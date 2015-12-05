@@ -1,8 +1,18 @@
-#include "client.h"
 #include <iostream>
+#include "client.h"
 
 int main(void)
 {
-	/* code */
-	return 0;
+    Client client;
+    if(client.start())
+    {
+        std::cout << "Connect Succesful" << std::endl;
+    }
+    else
+    {
+        std::cout << "Didn't connect" << std::endl;
+    }
+    client.process();
+    return 0;
 }
+
