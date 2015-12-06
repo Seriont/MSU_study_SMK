@@ -67,7 +67,7 @@ bool Client::process()
         FD_SET(connect_socket, &read_fds);
         FD_SET(0, &read_fds);
         
-        if (select(max_ds+1, &read_fds, NULL, NULL, NULL) < 0)
+if (select(max_ds+1, &read_fds, NULL, NULL, NULL) < 0)
         {
             // generate throw
             return false;
@@ -78,6 +78,7 @@ bool Client::process()
             if (!getMessage())
             {
                 std::cout << "Server stop work, I'm going closed" << std::endl;
+                return true;
             }
         }
         if (FD_ISSET(0, &read_fds))
@@ -105,11 +106,16 @@ bool Client::getMessage()
 {
     char *s = new char [MAX_MESSAGE_LEN+1];
     int len;
-    if ((len = read(connect_socket, s, MAX_MESSAGE_LEN)) < 0)
+    if ((len = read(connect_socket, s, MAX_MESSAGE_LEN)) <= 0)
     {
         // generate throw
         return false;
     }
+    // if (len == 0)
+    // {
+        // std::cout << "Server stopped work" << std::endl;
+        // return true;
+    // }
     s[len] = '\0';
     std::cout << s << std::endl;
     delete [] s;
