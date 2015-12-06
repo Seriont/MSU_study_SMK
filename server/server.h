@@ -33,6 +33,7 @@ public:
 	void sendServerMessage(char message[]);
 	Server() {}
 private:
+	char* getInputMessage();
 	bool getMessage(char message[], User *user);
 	void sendToAllMessage(char message[]);
 	bool addNewClient();
@@ -41,6 +42,19 @@ private:
 	std::set<User *> clients;
 	int listening_socket;
 };
+
+
+char* Server::getInputMessage()
+{
+    char *s = new char [MAX_MESSAGE_LEN+1];
+    int i = 0, ch;
+    while((ch = getchar()) != '\n' && i < MAX_MESSAGE_LEN)
+    {
+        s[i++] = ch;
+    }
+    s[i] = '\0';
+    return s;
+}
 
 
 bool Server::startServer() 
@@ -127,6 +141,7 @@ bool Server::process()
 		FD_ZERO(&read_fds);
 		int max_number = listening_socket;
 		FD_SET(listening_socket, &read_fds);
+		FD_SET(0, &read_fds);
 		for (std::set<User *>::iterator it = clients.begin(); 
 			it != clients.end(); it++)
 		{
@@ -151,6 +166,11 @@ bool Server::process()
 			{
 				return false;
 			}
+		}
+		if (FD_ISSET(0, &read_fds))
+		{
+			char *s = getInputMessage();
+			sendToAllMessage(s);
 		}
 
 		// message reading and deleting closed sockets

@@ -4,7 +4,7 @@
 int main(void)
 {
     Client client;
-    if(client.start())
+    if (client.start())
     {
         std::cout << "Connect Succesful" << std::endl;
     }
@@ -12,7 +12,10 @@ int main(void)
     {
         std::cout << "Didn't connect" << std::endl;
     }
-    client.process();
+    if (!client.process())
+    {
+        std::cout << "connect was broken" << std::endl;
+    }
     return 0;
 }
 

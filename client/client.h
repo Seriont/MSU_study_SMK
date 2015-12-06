@@ -1,9 +1,11 @@
 #include <sys/types.h>
 #include <cstdio>
+#include <cstring>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <netinet/in.h>
 #include "../constants.h"
+#include <iostream>
 
 
 class Client
@@ -14,9 +16,23 @@ public:
     bool process();
 private:
     int connect_socket;
-    char* getMessage();
+    char* getInputMessage();
+    bool getMessage();
     bool sendMessage(char s[]);
 };
+
+
+char* Client::getInputMessage()
+{
+    char *s = new char [MAX_MESSAGE_LEN+1];
+    int i = 0, ch;
+    while((ch = getchar()) != '\n' && i < MAX_MESSAGE_LEN)
+    {
+        s[i++] = ch;
+    }
+    s[i] = '\0';
+    return s;
+}
 
 
 bool Client::start()
@@ -59,10 +75,43 @@ bool Client::process()
         if (FD_ISSET(connect_socket, &read_fds))
         {
             // get message from server
+            if (!getMessage())
+            {
+                std::cout << "Server stop work, I'm going closed" << std::endl;
+            }
         }
         if (FD_ISSET(0, &read_fds))
         {
-            // send message to server
+            char *s = getInputMessage();
+            sendMessage(s);
         }
     }
+}
+
+
+bool Client::sendMessage(char *s)
+{
+    if(write(connect_socket, s, strlen(s)) < 0)
+    {
+        // generate throw
+        return false;
+    }
+    delete [] s;
+    return true;
+}
+
+
+bool Client::getMessage()
+{
+    char *s = new char [MAX_MESSAGE_LEN+1];
+    int len;
+    if ((len = read(connect_socket, s, MAX_MESSAGE_LEN)) < 0)
+    {
+        // generate throw
+        return false;
+    }
+    s[len] = '\0';
+    std::cout << s << std::endl;
+    delete [] s;
+    return true;
 }
