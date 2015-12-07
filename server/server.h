@@ -46,14 +46,14 @@ private:
 
 char* Server::getInputMessage()
 {
-    char *s = new char [MAX_MESSAGE_LEN+1];
-    int i = 0, ch;
-    while((ch = getchar()) != '\n' && i < MAX_MESSAGE_LEN)
+    char *message = new char [MAX_MESSAGE_LEN+1];
+    int i = 0, character;
+    while((character = getchar()) != '\n' && i < MAX_MESSAGE_LEN)
     {
-        s[i++] = ch;
+        message[i++] = character;
     }
-    s[i] = '\0';
-    return s;
+    message[i] = '\0';
+    return message;
 }
 
 
@@ -169,8 +169,8 @@ bool Server::process()
 		}
 		if (FD_ISSET(0, &read_fds))
 		{
-			char *s = getInputMessage();
-			sendToAllMessage(s);
+			char *message = getInputMessage();
+            sendToAllMessage(message);
 		}
 
 		// message reading and deleting closed sockets
@@ -188,9 +188,10 @@ bool Server::process()
 		{
 			if (FD_ISSET(current_clients[i]->socket, &read_fds))
 			{
-				char message[MAX_MESSAGE_LEN+1];
+                char *message = new char [MAX_MESSAGE_LEN+1];
 				if (!getMessage(message, current_clients[i]))
 				{
+                    delete [] message;
 					return false;
 				}
 				if (strlen(message) == 0)
@@ -202,6 +203,7 @@ bool Server::process()
 					continue;
 				}
 				sendToAllMessage(message);
+                delete [] message;
 			}
 		}
 		delete [] current_clients;
