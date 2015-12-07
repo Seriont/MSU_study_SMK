@@ -24,14 +24,14 @@ private:
 
 char* Client::getInputMessage()
 {
-    char *s = new char [MAX_MESSAGE_LEN+1];
-    int i = 0, ch;
-    while((ch = getchar()) != '\n' && i < MAX_MESSAGE_LEN)
+    char *message = new char [MAX_MESSAGE_LEN+1];
+    int i = 0, character;
+    while((character = getchar()) != '\n' && i < MAX_MESSAGE_LEN)
     {
-        s[i++] = ch;
+        message[i++] = character;
     }
-    s[i] = '\0';
-    return s;
+    message[i] = '\0';
+    return message;
 }
 
 
@@ -67,7 +67,7 @@ bool Client::process()
         FD_SET(connect_socket, &read_fds);
         FD_SET(0, &read_fds);
         
-if (select(max_ds+1, &read_fds, NULL, NULL, NULL) < 0)
+		if (select(max_ds+1, &read_fds, NULL, NULL, NULL) < 0)
         {
             // generate throw
             return false;
@@ -77,36 +77,36 @@ if (select(max_ds+1, &read_fds, NULL, NULL, NULL) < 0)
             // get message from server
             if (!getMessage())
             {
-                std::cout << "Server stop work, I'm going closed" << std::endl;
+                std::cout << "Server's stopped, I'm going to close" << std::endl;
                 return true;
             }
         }
         if (FD_ISSET(0, &read_fds))
         {
-            char *s = getInputMessage();
-            sendMessage(s);
+            char *message = getInputMessage();
+            sendMessage(message);
         }
     }
 }
 
 
-bool Client::sendMessage(char *s)
+bool Client::sendMessage(char *message)
 {
-    if(write(connect_socket, s, strlen(s)) < 0)
+    if(write(connect_socket, message, strlen(message)) < 0)
     {
         // generate throw
         return false;
     }
-    delete [] s;
+    delete [] message;
     return true;
 }
 
 
 bool Client::getMessage()
 {
-    char *s = new char [MAX_MESSAGE_LEN+1];
+    char *message = new char [MAX_MESSAGE_LEN+1];
     int len;
-    if ((len = read(connect_socket, s, MAX_MESSAGE_LEN)) <= 0)
+    if ((len = read(connect_socket, message, MAX_MESSAGE_LEN)) <= 0)
     {
         // generate throw
         return false;
@@ -116,8 +116,8 @@ bool Client::getMessage()
         // std::cout << "Server stopped work" << std::endl;
         // return true;
     // }
-    s[len] = '\0';
-    std::cout << s << std::endl;
-    delete [] s;
+    message[len] = '\0';
+    std::cout << message << std::endl;
+    delete [] message;
     return true;
 }
