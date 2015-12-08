@@ -34,7 +34,7 @@ public:
 	void sendServerMessage(char message[]);
 	Server() {}
 private:
-	char* getInputMessage();
+	bool getInputMessage(char message[]);
 	bool getMessage(char message[], User *user);
 	void sendToAllMessage(char message[]);
 	bool addNewClient();
@@ -45,9 +45,8 @@ private:
 };
 
 
-char* Server::getInputMessage()
+bool Server::getInputMessage(char message[])
 {
-    char *message = new char [MAX_MESSAGE_LEN+1];
     int i = 0, character;
     while((character = getchar()) != '\n' && i < MAX_MESSAGE_LEN)
     {
@@ -132,26 +131,27 @@ void Server::sendServerMessage(char message[])
 bool Server::process()
 {
 	fd_set read_fds;
+	char *message = new char [MAX_MESSAGE_LEN+1];
 	while (true)
 	{
 		// read_fds initialization
 		FD_ZERO(&read_fds);
-		int max_number = listen_socket;
+		int max_ds = listen_socket;
 		FD_SET(listen_socket, &read_fds);
 		FD_SET(0, &read_fds);
 		for (std::set<User *>::iterator it = clients.begin(); 
 			it != clients.end(); it++)
 		{
 			FD_SET((*it)->socket, &read_fds);
-			if ((*it)->socket > max_number)
-				max_number = (*it)->socket;
+			if ((*it)->socket > max_ds)
+				max_ds = (*it)->socket;
 		}
 		// query handling
 
 		// waiting for queries
 
 		// the last pointer is a timer
-		if (select(max_number + 1, &read_fds, NULL, NULL, NULL) < 1)
+		if (select(max_ds + 1, &read_fds, NULL, NULL, NULL) < 1)
 		{
 			sendServerMessage((char *)"server's fallen");
 			throw ErrorExept("error: server's fallen");
@@ -166,13 +166,12 @@ bool Server::process()
 			}
 			catch(const ErrorExept& exeption)
 			{
-				std::cout << exeption.getErrorMessage() << std::endl;
-				std::cout << strerror(exeption.getErrorCode()) << std::endl;
+				exeption.printError();
 			}
 		}
 		if (FD_ISSET(0, &read_fds))
 		{
-			char *message = getInputMessage();
+			getInputMessage(message);
             sendToAllMessage(message);
 		}
 
@@ -191,15 +190,13 @@ bool Server::process()
 		{
 			if (FD_ISSET(current_clients[i]->socket, &read_fds))
 			{
-                char *message = new char [MAX_MESSAGE_LEN+1];
                 try
                 {
 					getMessage(message, current_clients[i]);
                 }
                 catch (const ErrorExept& exeption)
 				{
-					std::cout << exeption.getErrorMessage() << std::endl;
-					std::cout << strerror(exeption.getErrorCode()) << std::endl;					
+					exeption.printError();				
 				}
 				if (strlen(message) == 0)
 				{
@@ -210,9 +207,9 @@ bool Server::process()
 					continue;
 				}
 				sendToAllMessage(message);
-                delete [] message;
 			}
 		}
-		delete [] current_clients;
+		delete[] current_clients;
 	}
+	delete[] message;
 }

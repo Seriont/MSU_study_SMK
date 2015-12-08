@@ -14,11 +14,19 @@ public:
 	~ErrorExept();
 	const char* getErrorMessage() const;
 	int getErrorCode() const;
+	void printError() const;
 private:
 	char *err_message;
 	int err_code;
 	static char *strdup(const char *string); // ~strcpy, but use "new"
 };
+
+
+void ErrorExept::printError() const
+{
+	std::cout << getErrorMessage() << std::endl;
+    std::cout << strerror(getErrorCode()) << std::endl;
+}
 
 
 ErrorExept::ErrorExept(const char error_message[])

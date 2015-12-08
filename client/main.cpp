@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include "../errorexept.h"
 
 int main(void)
 {
@@ -17,10 +18,16 @@ int main(void)
         {
             cmd = true;
             int pid;
-            if ((pid = fork()) < 0)
+            try
             {
-                std::cout << "Couldn't create new process" << std::endl;
-                // generate twrow
+                if ((pid = fork()) < 0)
+                {
+                    throw ErrorExept("error: couldn't create new process");
+                }
+            }
+            catch (const ErrorExept& exeption)
+            {
+                exeption.printError();
             }
             if (pid == 0)
             {
@@ -43,4 +50,3 @@ int main(void)
     }
     return 0;
 }
-

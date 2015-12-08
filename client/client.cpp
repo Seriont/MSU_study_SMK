@@ -1,24 +1,20 @@
 #include <iostream>
 #include "client.h"
+#include "../errorexept.h"
 
 
 int main(void)
 {
     Client client;
-    if (client.start())
+    try
     {
+        client.start();
         std::cout << "Connect Succesful" << std::endl;
+        client.process();
     }
-    else
+    catch (const ErrorExept& exeption)
     {
-        // generate twrow
-        std::cout << "Didn't connect" << std::endl;
-        return 1;
-    }
-    if (!client.process())
-    {
-        std::cout << "Connect was broken" << std::endl;
-        return 2;
+        exeption.printError();
     }
     return 0;
 }
