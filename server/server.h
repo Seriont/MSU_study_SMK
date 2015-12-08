@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <iostream>
 #include "../constants.h"
+#include "../errorexept.h"
 #include <cstdio>
 
 //we should describe the User class, whether it should
@@ -40,7 +41,7 @@ private:
 	// bool isNameValid(void); // checking for forbidden characters
 	// bool isNameUsed(void); // checking for equal usernames
 	std::set<User *> clients;
-	int listening_socket;
+	int listen_socket;
 };
 
 
@@ -59,28 +60,24 @@ char* Server::getInputMessage()
 
 bool Server::startServer() 
 {
-	listening_socket = socket(AF_INET, SOCK_STREAM, 0);
-	if (listening_socket < 0)
+	listen_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if (listen_socket < 0)
 	{
-		perror("error: couldn't call socket");
-		return false;
+		throw ErrorExept("error: couldn't call socket");
 	}
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(PORT); // PORT is a constant
 	addr.sin_addr.s_addr = INADDR_ANY;
-	if (bind(listening_socket, (struct sockaddr *) &addr,
-		 sizeof(addr)) != 0)
+	if (bind(listen_socket, (struct sockaddr *) &addr, sizeof(addr)) != 0)
 	{
-		perror("error: couldn't call bind");
-		close(listening_socket);
-		return false;
+		close(listen_socket);
+		throw ErrorExept("error: couldn't call bind");
 	}
-	if (listen(listening_socket, MAX_REQUESTS))
+	if (listen(listen_socket, MAX_REQUESTS))
 	{
-		perror("error: couldn't call listen");
-		close(listening_socket);
-		return false;
+		close(listen_socket);
+		throw ErrorExept("error: couldn't call listen");
 	}
 	return true;
 }
@@ -88,10 +85,10 @@ bool Server::startServer()
 
 bool Server::addNewClient()
 {
-	int socket = accept(listening_socket, NULL, NULL);
+	int socket = accept(listen_socket, NULL, NULL);
 	if (socket < 0)
 	{
-		return false;
+		throw ErrorExept("error: couldn't connect user");
 	}
 	User *new_user = new User();
 	new_user->socket = socket;
@@ -105,7 +102,7 @@ bool Server::getMessage(char message[], User *user)
 	size_t bytes_read = read(user->socket, message, MAX_MESSAGE_LEN);
 	if (bytes_read < 0)
 	{
-		return false;
+		throw ErrorExept("error: couldn't get message");
 	}
 	message[bytes_read/sizeof(char)] = '\0';
 	return true;
@@ -139,8 +136,8 @@ bool Server::process()
 	{
 		// read_fds initialization
 		FD_ZERO(&read_fds);
-		int max_number = listening_socket;
-		FD_SET(listening_socket, &read_fds);
+		int max_number = listen_socket;
+		FD_SET(listen_socket, &read_fds);
 		FD_SET(0, &read_fds);
 		for (std::set<User *>::iterator it = clients.begin(); 
 			it != clients.end(); it++)
@@ -156,15 +153,21 @@ bool Server::process()
 		// the last pointer is a timer
 		if (select(max_number + 1, &read_fds, NULL, NULL, NULL) < 1)
 		{
-			return false;
+			sendServerMessage((char *)"server's fallen");
+			throw ErrorExept("error: server's fallen");
 		}
 
 		// new client adding
-		if (FD_ISSET(listening_socket, &read_fds))
+		if (FD_ISSET(listen_socket, &read_fds))
 		{
-			if (!addNewClient())
+			try
 			{
-				return false;
+				addNewClient();
+			}
+			catch(const ErrorExept& exeption)
+			{
+				std::cout << exeption.getErrorMessage() << std::endl;
+				std::cout << strerror(exeption.getErrorCode()) << std::endl;
 			}
 		}
 		if (FD_ISSET(0, &read_fds))
@@ -189,10 +192,14 @@ bool Server::process()
 			if (FD_ISSET(current_clients[i]->socket, &read_fds))
 			{
                 char *message = new char [MAX_MESSAGE_LEN+1];
-				if (!getMessage(message, current_clients[i]))
+                try
+                {
+					getMessage(message, current_clients[i]);
+                }
+                catch (const ErrorExept& exeption)
 				{
-                    delete [] message;
-					return false;
+					std::cout << exeption.getErrorMessage() << std::endl;
+					std::cout << strerror(exeption.getErrorCode()) << std::endl;					
 				}
 				if (strlen(message) == 0)
 				{
