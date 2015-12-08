@@ -193,20 +193,20 @@ bool Server::process()
                 try
                 {
 					getMessage(message, current_clients[i]);
+					if (strlen(message) == 0)
+					{
+						// in this case user's quitened and his socket
+						// should be deleted
+						close(current_clients[i]->socket);
+						clients.erase(current_clients[i]);
+						continue;
+					}
+					sendToAllMessage(message);
                 }
                 catch (const ErrorExept& exeption)
 				{
-					exeption.printError();				
+					exeption.printError();			
 				}
-				if (strlen(message) == 0)
-				{
-					// in this case user's quitened and his socket
-					// should be deleted
-					close(current_clients[i]->socket);
-					clients.erase(current_clients[i]);
-					continue;
-				}
-				sendToAllMessage(message);
 			}
 		}
 		delete[] current_clients;
