@@ -7,6 +7,7 @@
 #include "../constants.h"
 #include "../errorexept.h"
 #include <iostream>
+#include <arpa/inet.h>
 
 
 class Client
@@ -45,7 +46,10 @@ bool Client::start()
     sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(PORT);
-    addr.sin_addr.s_addr = INADDR_ANY;
+    if (!inet_aton(IP_ADDRESS, &(addr.sin_addr)))
+	{
+		throw ErrorExept("error: invalid IP");
+	}
     if (0 != connect(connect_socket, (struct sockaddr *)&addr, sizeof(addr)))
     {
         close(connect_socket);

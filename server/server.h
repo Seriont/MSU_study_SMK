@@ -163,6 +163,7 @@ bool Server::process()
 			try
 			{
 				addNewClient();
+				std::cout << "New connection." << std::endl;
 			}
 			catch(const ErrorExept& exeption)
 			{
