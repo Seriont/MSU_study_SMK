@@ -9,35 +9,39 @@
 #include <iostream>
 #include "../constants.h"
 #include "../errorexept.h"
+#include "../functions.h"
 #include <cstdio>
-
-//we should describe the User class, whether it should
-// be global or not, and what demands should it meet
-
-// all arguments, that are marked as 'void' will be replaced
-// by the person, who will code that function
 
 
 class User 
 {
-public:
+	friend class Server;
+private:
 	int socket;
-	User() {}
+
+public:
+	char *username;
+	bool is_online;
+	Status status;
+	User();
+	~User();
 };
 
 
 class Server 
 {
 public:
-	bool startServer();
-	bool process();
+	void startServer();
+	void process();
 	void sendServerMessage(char message[]);
 	Server() {}
+
 private:
-	bool getInputMessage(char message[]);
-	bool getMessage(char message[], User *user);
+	void getInputMessage(char message[]);
+	void getMessage(char message[], User *user, DataType type);
 	void sendToAllMessage(char message[]);
-	bool addNewClient();
+	void addNewClient();
+	void makeMessage(char message[], char username[], char text[]);
 	// bool isNameValid(void); // checking for forbidden characters
 	// bool isNameUsed(void); // checking for equal usernames
 	std::set<User *> clients;
@@ -45,7 +49,20 @@ private:
 };
 
 
-bool Server::getInputMessage(char message[])
+User::User()
+{
+	is_online = true;
+	status = USERNAME_REQUIRED;
+}
+
+
+User::~User()
+{
+	delete[] username;
+}
+
+
+void Server::getInputMessage(char message[])
 {
     int i = 0, character;
     while((character = getchar()) != '\n' && i < MAX_MESSAGE_LEN)
@@ -53,11 +70,10 @@ bool Server::getInputMessage(char message[])
         message[i++] = character;
     }
     message[i] = '\0';
-    return message;
 }
 
 
-bool Server::startServer() 
+void Server::startServer() 
 {
 	listen_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (listen_socket < 0)
@@ -66,24 +82,24 @@ bool Server::startServer()
 	}
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(PORT); // PORT is a constant
+	addr.sin_port = htons(PORT);
 	addr.sin_addr.s_addr = INADDR_ANY;
 	if (bind(listen_socket, (struct sockaddr *) &addr, sizeof(addr)) != 0)
 	{
 		close(listen_socket);
 		throw ErrorExept("error: couldn't call bind");
 	}
-	if (listen(listen_socket, MAX_REQUESTS))
+	if (listen(listen_socket, MAX_REQUESTS) != 0)
 	{
 		close(listen_socket);
 		throw ErrorExept("error: couldn't call listen");
 	}
-	return true;
 }
 
 
-bool Server::addNewClient()
+void Server::addNewClient()
 {
+	// here we can save the IP adress of the client
 	int socket = accept(listen_socket, NULL, NULL);
 	if (socket < 0)
 	{
@@ -92,19 +108,22 @@ bool Server::addNewClient()
 	User *new_user = new User();
 	new_user->socket = socket;
 	clients.insert(new_user);
-	return true;
 }
 
 
-bool Server::getMessage(char message[], User *user)
+void Server::getMessage(char message[], User *user, DataType type)
 {
-	size_t bytes_read = read(user->socket, message, MAX_MESSAGE_LEN);
+	size_t bytes_read;
+	if (type == MESSAGE)
+		bytes_read = read(user->socket, message, MAX_MESSAGE_LEN);
+	else if (type == USERNAME)
+		bytes_read = read(user->socket, message, USERNAME_MAX_LEN);
 	if (bytes_read < 0)
 	{
 		throw ErrorExept("error: couldn't get message");
 	}
 	message[bytes_read/sizeof(char)] = '\0';
-	return true;
+	normalizeString(message);
 }
 
 
@@ -113,10 +132,11 @@ void Server::sendToAllMessage(char message[])
 	for (std::set<User *>::iterator it = clients.begin();
 		it != clients.end(); it++)
 	{
+		if ((*it)->is_online == false)
+			continue;
 		if (write((*it)->socket, message, strlen(message) + 1) < 0)
 		{
-			std::cout << "Didn't manage to send the message to user[";
-			std::cout << (*it)->socket << "]!" << std::endl;
+			throw ErrorExept("error: couldn't send message");
 		}
 	}
 }
@@ -128,10 +148,30 @@ void Server::sendServerMessage(char message[])
 }
 
 
-bool Server::process()
+void Server::makeMessage(char message[], char username[], char text[])
+{
+	int i = 0;
+	while (username[i] != '\0')
+	{
+		message[i] = username[i];
+		i++;
+	}
+	message[i++] = ':';
+	message[i++] = ' ';
+	int j = 0;
+	while (text[j] != '\0')
+	{
+		message[i] = text[j];
+		i++;
+		j++;
+	}
+	message[i] = '\0';
+}
+
+
+void Server::process()
 {
 	fd_set read_fds;
-	char *message = new char [MAX_MESSAGE_LEN+1];
 	while (true)
 	{
 		// read_fds initialization
@@ -172,45 +212,70 @@ bool Server::process()
 		}
 		if (FD_ISSET(0, &read_fds))
 		{
+			char *message = new char[MAX_MESSAGE_LEN+1];
 			getInputMessage(message);
             sendToAllMessage(message);
+			delete[] message;
 		}
 
 		// message reading and deleting closed sockets
-
-		// <current_clients> is a list of clients, who were in session
-		// in the beginning of the current iteration of the cycle
-		User **current_clients = new User*[(const int)clients.size()];
-		int i = 0;
 		for (std::set<User *>::iterator it = clients.begin();
-			it != clients.end(); it++, i++)
+			it != clients.end(); it++)
 		{
-			current_clients[i] = *it;
-		}
-		for (int i = 0; i < (int)clients.size(); i++)
-		{
-			if (FD_ISSET(current_clients[i]->socket, &read_fds))
+			User *client = *it;
+			if (FD_ISSET(client->socket, &read_fds))
 			{
+				if (client->is_online == false)
+					continue;
                 try
                 {
-					getMessage(message, current_clients[i]);
-					if (strlen(message) == 0)
+					if (client->status == USERNAME_REQUIRED)
 					{
-						// in this case user's quitened and his socket
-						// should be deleted
-						close(current_clients[i]->socket);
-						clients.erase(current_clients[i]);
-						continue;
+						char *username = new char[USERNAME_MAX_LEN+1];
+						getMessage(username, client, USERNAME);
+						if (strlen(username) == 0)
+							client->is_online = false;
+						else
+						{
+							client->username = username;
+							client->status = AUTHORIZED;
+						}
 					}
-					sendToAllMessage(message);
-                }
+					else if (client->status == AUTHORIZED)
+					{
+						char *message = new char[MAX_MESSAGE_LEN];
+						char *text = new char[TEXT_MAX_LEN];
+						getMessage(text, client, MESSAGE);
+						if (strlen(text) == 0)
+							client->is_online = false;
+						else
+						{
+							makeMessage(message, client->username, text);
+							delete[] text;
+							sendToAllMessage(message);
+						}
+						delete[] message;
+                	}
+				}
                 catch (const ErrorExept& exeption)
 				{
 					exeption.printError();			
 				}
 			}
 		}
-		delete[] current_clients;
+		std::set<User *>::iterator it = clients.begin();
+		while(it != clients.end())
+		{
+			User *client = *it;
+			if (client->is_online == true)
+			{
+				it++;
+				continue;
+			}
+			close(client->socket);
+			clients.erase(client);
+			delete client;
+			it = clients.begin();
+		}
 	}
-	delete[] message;
 }

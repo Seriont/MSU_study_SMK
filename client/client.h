@@ -63,7 +63,6 @@ bool Client::process()
 {
     fd_set read_fds;
     int max_ds = connect_socket;
-    char *message = new char [MAX_MESSAGE_LEN+1];
     for(;;)
     {
         FD_ZERO(&read_fds);
@@ -76,6 +75,7 @@ bool Client::process()
         }
         if (FD_ISSET(connect_socket, &read_fds))
         {
+			char *message = new char[MAX_MESSAGE_LEN];
             if (!getMessage(message))
             {
                 std::cout << "Server's stopped, I'm going to close" << std::endl;
@@ -85,9 +85,11 @@ bool Client::process()
             {
                 std::cout << message << std::endl;
             }
+			delete[] message;
         }
         if (FD_ISSET(0, &read_fds))
         {
+			char *message = new char[MAX_MESSAGE_LEN];
             try
             {
                 getInputMessage(message);
@@ -97,9 +99,9 @@ bool Client::process()
             {
                 exeption.printError();
             }
+			delete[] message;
         }
     }
-    delete[] message;
 }
 
 
